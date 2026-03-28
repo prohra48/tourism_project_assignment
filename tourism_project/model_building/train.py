@@ -30,47 +30,44 @@ ytrain, ytest = data["ytrain"]["ProdTaken"], data["ytest"]["ProdTaken"]
 
 # 3. Define the Preprocessing Pipeline
 print("Building Preprocessing Pipeline...")
-# Find out which columns are numbers and which are text
 numeric_features = Xtrain.select_dtypes(include=['int64', 'float64']).columns
 categorical_features = Xtrain.select_dtypes(include=['object']).columns
 
-# Define how to handle numbers (fill missing with median, then scale)
 numeric_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='median')),
     ('scaler', StandardScaler())])
 
-# Define how to handle text (fill missing with most common, then convert to numbers)
 categorical_transformer = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='most_frequent')),
     ('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
-# Combine them into one preprocessor block
 preprocessor = ColumnTransformer(
     transformers=[
         ('num', numeric_transformer, numeric_features),
         ('cat', categorical_transformer, categorical_features)])
 
-# Initialize MLflow
+# Initialize MLflow with explicit local path to fix Linux/Windows permission errors
+mlflow.set_tracking_uri("file://" + os.path.abspath("mlruns"))
 mlflow.set_experiment("Tourism_Package_Prediction")
 
 with mlflow.start_run():
     # 4. Create the final Pipeline: Preprocessor -> Model
-    # We use a slightly smaller grid so GitHub Actions doesn't time out
     rf = RandomForestClassifier(random_state=42)
     
-    # Notice we bundle the preprocessor and the model together!
     pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                                ('classifier', rf)])
     
-    # Because 'classifier' is a step in the pipeline, we have to add 'classifier__' to our parameter names
+    # THE FULLY EXPANDED PARAMETER GRID (Notice the 'classifier__' prefix!)
     param_grid = {
-        'classifier__n_estimators': [50, 100],
-        'classifier__max_depth': [10, None],
-        'classifier__min_samples_split': [2, 5]
+        'classifier__n_estimators': [50, 100, 200],
+        'classifier__max_depth': [5, 10, 20, None],
+        'classifier__min_samples_split': [2, 5, 10],
+        'classifier__min_samples_leaf': [1, 2, 4],
+        'classifier__bootstrap': [True, False]
     }
 
     # 5. Tune the pipeline
-    print("Tuning and training the model...")
+    print("Tuning and training the model... (This may take a while with the expanded grid!)")
     grid_search = GridSearchCV(estimator=pipeline, param_grid=param_grid, cv=3, n_jobs=-1, scoring='accuracy')
     grid_search.fit(Xtrain, ytrain)
     
