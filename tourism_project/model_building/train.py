@@ -14,7 +14,7 @@ import os
 
 # 1. Setup and Authentication
 HF_TOKEN = os.getenv("HF_TOKEN")
-DATASET_REPO = "prohra48/tourism-project"
+DATASET_REPO = "prohra48/tourism-app"
 MODEL_REPO = "prohra48/tourism-model"
 
 # 2. Load Train and Test Data
