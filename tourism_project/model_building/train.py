@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import accuracy_score, f1_score, classification_report
+from sklearn.metrics import accuracy_score, f1_score
 from huggingface_hub import hf_hub_download, HfApi
 import mlflow
 import mlflow.sklearn
@@ -11,7 +11,7 @@ import os
 # 1. Setup and Authentication
 HF_TOKEN = os.getenv("HF_TOKEN")
 DATASET_REPO = "prohra48/tourism-project"
-MODEL_REPO = "prohra48/tourism-model" # Make sure to create this model space in Hugging Face!
+MODEL_REPO = "prohra48/tourism-model"
 
 # 2. Load Train and Test Data from Hugging Face data space
 print("Loading data from Hugging Face...")
@@ -22,23 +22,21 @@ for file in files:
     data[file.split('.')[0]] = pd.read_csv(path)
 
 Xtrain, Xtest = data["Xtrain"], data["Xtest"]
-# Ensure target variables are 1D arrays/Series
 ytrain, ytest = data["ytrain"]["ProdTaken"], data["ytest"]["ProdTaken"] 
 
 # Initialize MLflow experiment
 mlflow.set_experiment("Tourism_Package_Prediction")
 
 with mlflow.start_run():
-    
-    # 3. Define a model and parameters
-     rf = RandomForestClassifier(random_state=42)
-     param_grid = {
-        'n_estimators': [50, 100, 200],       # Number of trees in the forest
-        'max_depth': [5, 10, 20, None],       # How deep the trees can grow
-        'min_samples_split': [2, 5, 10],      # Minimum samples required to split a node
-        'min_samples_leaf': [1, 2, 4],        # Minimum samples required to form a final leaf (decision)
-        'bootstrap': [True, False]            # Whether to use random subsets of data for each tree
-     }
+    # 3. Define a model and the EXPANDED parameters
+    rf = RandomForestClassifier(random_state=42)
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [5, 10, 20, None],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4],
+        'bootstrap': [True, False]
+    }
 
     # 4. Tune the model with the defined parameters
     print("Tuning and training the model...")
@@ -71,13 +69,11 @@ joblib.dump(best_model, "model.joblib")
 
 api = HfApi(token=HF_TOKEN)
 
-# Check if model repo exists, create if not
 try:
     api.repo_info(repo_id=MODEL_REPO, repo_type="model")
 except Exception:
     api.create_repo(repo_id=MODEL_REPO, repo_type="model", private=False)
 
-# Upload the joblib file
 api.upload_file(
     path_or_fileobj="model.joblib",
     path_in_repo="model.joblib",
