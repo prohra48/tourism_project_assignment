@@ -2,6 +2,10 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
 from huggingface_hub import hf_hub_download, HfApi
 import mlflow
 import mlflow.sklearn
@@ -13,7 +17,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 DATASET_REPO = "prohra48/tourism-project"
 MODEL_REPO = "prohra48/tourism-model"
 
-# 2. Load Train and Test Data from Hugging Face data space
+# 2. Load Train and Test Data
 print("Loading data from Hugging Face...")
 files = ["Xtrain.csv", "Xtest.csv", "ytrain.csv", "ytest.csv"]
 data = {}
@@ -24,47 +28,69 @@ for file in files:
 Xtrain, Xtest = data["Xtrain"], data["Xtest"]
 ytrain, ytest = data["ytrain"]["ProdTaken"], data["ytest"]["ProdTaken"] 
 
-# Initialize MLflow experiment
+# 3. Define the Preprocessing Pipeline
+print("Building Preprocessing Pipeline...")
+# Find out which columns are numbers and which are text
+numeric_features = Xtrain.select_dtypes(include=['int64', 'float64']).columns
+categorical_features = Xtrain.select_dtypes(include=['object']).columns
+
+# Define how to handle numbers (fill missing with median, then scale)
+numeric_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())])
+
+# Define how to handle text (fill missing with most common, then convert to numbers)
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+# Combine them into one preprocessor block
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numeric_features),
+        ('cat', categorical_transformer, categorical_features)])
+
+# Initialize MLflow
 mlflow.set_experiment("Tourism_Package_Prediction")
 
 with mlflow.start_run():
-    # 3. Define a model and the EXPANDED parameters
+    # 4. Create the final Pipeline: Preprocessor -> Model
+    # We use a slightly smaller grid so GitHub Actions doesn't time out
     rf = RandomForestClassifier(random_state=42)
+    
+    # Notice we bundle the preprocessor and the model together!
+    pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                               ('classifier', rf)])
+    
+    # Because 'classifier' is a step in the pipeline, we have to add 'classifier__' to our parameter names
     param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [5, 10, 20, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'bootstrap': [True, False]
+        'classifier__n_estimators': [50, 100],
+        'classifier__max_depth': [10, None],
+        'classifier__min_samples_split': [2, 5]
     }
 
-    # 4. Tune the model with the defined parameters
+    # 5. Tune the pipeline
     print("Tuning and training the model...")
-    grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=3, n_jobs=-1, scoring='accuracy')
+    grid_search = GridSearchCV(estimator=pipeline, param_grid=param_grid, cv=3, n_jobs=-1, scoring='accuracy')
     grid_search.fit(Xtrain, ytrain)
     
-    # Get the best model
     best_model = grid_search.best_estimator_
 
-    # 5. Evaluate the model performance
+    # 6. Evaluate
     predictions = best_model.predict(Xtest)
     accuracy = accuracy_score(ytest, predictions)
     f1 = f1_score(ytest, predictions)
     
-    print(f"Best Parameters: {grid_search.best_params_}")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"F1 Score: {f1:.4f}")
+    print(f"Accuracy: {accuracy:.4f} | F1 Score: {f1:.4f}")
 
-    # 6. Log all the tuned parameters and metrics
+    # 7. Log 
     mlflow.log_params(grid_search.best_params_)
     mlflow.log_metric("accuracy", accuracy)
     mlflow.log_metric("f1_score", f1)
-    
-    # Log the model in MLflow
     mlflow.sklearn.log_model(best_model, "random_forest_model")
 
-# 7. Register the best model in the Hugging Face model hub
-print("Saving and uploading best model to Hugging Face...")
+# 8. Register
+print("Saving and uploading best model...")
 joblib.dump(best_model, "model.joblib")
 
 api = HfApi(token=HF_TOKEN)
@@ -80,5 +106,4 @@ api.upload_file(
     repo_id=MODEL_REPO,
     repo_type="model"
 )
-
-print("Model training, logging, and registration completed successfully!")
+print("Pipeline complete!")
