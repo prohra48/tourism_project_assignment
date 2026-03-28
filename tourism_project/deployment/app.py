@@ -11,7 +11,7 @@ MODEL_REPO = "prohra48/tourism-model"
 
 model_path = hf_hub_download(
     repo_id=MODEL_REPO,
-    filename="model.pkl"
+    filename="model.joblib"
 )
 
 model = joblib.load(model_path)
