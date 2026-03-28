@@ -6,3 +6,4 @@ streamlit
 huggingface_hub
 datasets
 joblib
+mlflow
