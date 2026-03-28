@@ -2,7 +2,7 @@ from huggingface_hub import HfApi
 import os
 
 api = HfApi(token=os.getenv("HF_TOKEN"))
-SPACE_REPO = "prohra48/tourism-project" # The name of your Hugging Face Space
+SPACE_REPO = "prohra48/tourism-app" # The name of your Hugging Face Space
 
 print("Deploying app to Hugging Face Spaces...")
 api.upload_folder(
