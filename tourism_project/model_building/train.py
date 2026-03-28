@@ -31,13 +31,13 @@ mlflow.set_experiment("Tourism_Package_Prediction")
 with mlflow.start_run():
     # 3. Define a model and parameters
      rf = RandomForestClassifier(random_state=42)
-    param_grid = {
+     param_grid = {
         'n_estimators': [50, 100, 200],       # Number of trees in the forest
         'max_depth': [5, 10, 20, None],       # How deep the trees can grow
         'min_samples_split': [2, 5, 10],      # Minimum samples required to split a node
         'min_samples_leaf': [1, 2, 4],        # Minimum samples required to form a final leaf (decision)
         'bootstrap': [True, False]            # Whether to use random subsets of data for each tree
-    }
+     }
 
     # 4. Tune the model with the defined parameters
     print("Tuning and training the model...")
