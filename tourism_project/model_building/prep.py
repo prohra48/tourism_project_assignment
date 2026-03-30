@@ -10,8 +10,9 @@ from huggingface_hub import login, HfApi
 
 # Define constants for the dataset and output paths
 api = HfApi(token=os.getenv("HF_TOKEN"))
-DATASET_PATH = "hf://datasets/prohra48/tourism-app1/tourism.csv"
+DATASET_PATH = "hf://datasets/prohra48/tourism-app/tourism.csv"
 tourism_dataset = pd.read_csv(DATASET_PATH)
+tourism_dataset.drop(columns=["Unnamed: 0"], inplace=True, errors="ignore")
 print("Dataset loaded successfully.")
 
 # Define the target variable for the classification task
@@ -49,7 +50,7 @@ for file_path in files:
     api.upload_file(
         path_or_fileobj=file_path,
         path_in_repo=file_path.split("/")[-1], # just the filename
-        repo_id="prohra48/tourism-app1",
+        repo_id="prohra48/tourism-app",
         repo_type="dataset",
     )
 print("Data Preparation completely successfully!")
